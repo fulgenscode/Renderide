@@ -23,7 +23,7 @@ use crate::render_graph::pass::params::{
     GraphPassParameters, PassParameterField, PassParameterSchema,
 };
 use crate::render_graph::pass::{PassBuilder, RasterPass};
-use crate::render_graph::resources::{ImportedTextureHandle, TextureHandle};
+use crate::render_graph::resources::{ImportedTextureHandle, TextureHandle, ImportedBufferHandle};
 
 /// Graph handles for [`SceneColorComposePass`].
 #[derive(Clone, Copy, Debug)]
@@ -32,6 +32,8 @@ pub struct SceneColorComposeGraphResources {
     pub scene_color_hdr: TextureHandle,
     /// Final HDR scene color after the post-processing chain, or `scene_color_hdr` when no effects are active.
     pub post_processed_scene_color_hdr: TextureHandle,
+    /// Imported frame-uniform buffer for raster sample count used for seeding dither.
+    pub(crate) frame_uniforms: ImportedBufferHandle,
     /// Imported frame color (output).
     pub frame_color: ImportedTextureHandle,
 }
@@ -153,7 +155,7 @@ mod setup_tests {
     use crate::render_graph::resources::{
         AccessKind, FrameTargetRole, ImportSource, ImportedTextureDecl, TextureAccess,
         TransientArrayLayers, TransientExtent, TransientSampleCount, TransientTextureDesc,
-        TransientTextureFormat,
+        TransientTextureFormat,BufferImportSource, ImportedBufferDecl, BufferAccess, BackendFrameBufferKind,
     };
 
     #[test]
@@ -174,6 +176,18 @@ mod setup_tests {
                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
             alias: true,
         });
+        let frame_uniforms = builder.import_buffer(ImportedBufferDecl {
+        	label: "frame_uniforms",
+         	source: BufferImportSource::Frame(BackendFrameBufferKind::FrameUniforms),
+          	initial_access: BufferAccess::Uniform {
+           		stages: wgpu::ShaderStages::FRAGMENT,
+             	dynamic_offset: false,
+           	},
+            final_access: BufferAccess::Uniform {
+            	stages: wgpu::ShaderStages::FRAGMENT,
+             	dynamic_offset: false,
+            }
+        });
         let frame_color = builder.import_texture(ImportedTextureDecl {
             label: "frame_color",
             source: ImportSource::Frame(FrameTargetRole::ColorAttachment),
@@ -187,6 +201,7 @@ mod setup_tests {
         let mut pass = SceneColorComposePass::new(SceneColorComposeGraphResources {
             scene_color_hdr: hdr,
             post_processed_scene_color_hdr: hdr,
+            frame_uniforms: frame_uniforms,
             frame_color,
         });
         let mut b = PassBuilder::new("SceneColorCompose");
@@ -213,6 +228,7 @@ mod setup_tests {
         let resources = SceneColorComposeGraphResources {
             scene_color_hdr: TextureHandle(1),
             post_processed_scene_color_hdr: TextureHandle(2),
+            frame_uniforms: ImportedBufferHandle(3),
             frame_color: ImportedTextureHandle(0),
         };
 

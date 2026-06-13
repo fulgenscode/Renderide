@@ -85,6 +85,7 @@ fn add_main_graph_passes_and_edges(
         crate::passes::SceneColorComposeGraphResources {
             scene_color_hdr: h.scene_color_hdr,
             post_processed_scene_color_hdr: compose_input,
+            frame_uniforms: h.frame_uniforms, // TEST
             frame_color: h.color,
         },
     )));
